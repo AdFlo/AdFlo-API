@@ -5,4 +5,6 @@
     source venv/bin/activate
 # Deactivate environment 
     deactivate
-    
+
+# Install package
+  pip install package_name && pip freeze > requirements.txt
