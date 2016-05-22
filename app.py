@@ -6,9 +6,10 @@ import pymongo
 import boto3
 from bson.objectid import ObjectId
 from flask import Flask, request, jsonify
-from flask.ext.pymongo import PyMongo
 from bson import Binary, Code
 from bson.json_util import dumps
+import random
+import ast
 
 # Service resource
 s3 = boto3.resource('s3')
@@ -17,7 +18,6 @@ app = Flask(__name__)
 # Db client
 client = pymongo.MongoClient("localhost", 27017)
 db = client.customerad
-client = MongoClient(uri)
 
 @app.route('/ad', methods=['POST'])
 def ad():
@@ -45,21 +45,45 @@ def ad():
 
 @app.route('/target', methods=['GET'])
 def target():
-  # for item in db.collection.find_one(sort=[("customer_clicks", -1)]):
-  #   customer_clicks = item['customer_clicks']
-  #   descriptors = item['descriptors']
-  #   acqusition_rate = item['acqusition_rate']
-  #   customers_installed = item['customers_installed']
-  #   customers_reached = item['customers_reached']
-  #   template = item['template']
-  #   name = item['name']
-  # item = db.collection.find_one(sort=[("customer_clicks", -1)])
-  # return jsonify({'id': str(item['_id']), 'template': item['Item']['template']}), 201
-  for item in db.collection.find().sort("customer_clicks", pymongo.ASCENDING):
-    print str(item)
-    print '\n'
+  descriptors = request.args.get("descriptors");
+  descriptors = descriptors.split(",")
 
-  return "", 201
+  description = {}
+  percentages = {}
+
+  category = ""
+  template = ""
+
+  total_len = len(descriptors)
+  max = 0.0
+
+  for category in descriptors:
+    if category in description:
+      description[category] = description[category] + 1
+    else:
+      description[category] = 1
+
+  for category in descriptors:
+    percentages[category] = description[category] / float(total_len)
+    if percentages[category] > max:
+      max = percentages[category]
+
+  sorted_percentages = sorted(percentages, key=percentages.get, reverse=True)
+
+  for percent in sorted_percentages:
+    if float(random.uniform(0.0, 1.0)) > percentages[percent]:
+      category = percent
+      break
+
+  for item in db.collection.find().sort("customer_clicks", pymongo.ASCENDING):
+    curr_item = item['Item']
+    curr_descriptor = ast.literal_eval(curr_item['descriptors'])
+
+    for descriptor in curr_descriptor:
+      if descriptor == category:
+        return jsonify({'id': str(item['_id']), 'template': curr_item['template']}), 200
+
+  return jsonify({ 'message': 'No ads to display'}), 200
 
 @app.route('/ad', defaults={'id': None})
 @app.route('/ad/<id>/click', methods=['POST'])
@@ -76,25 +100,6 @@ def click(id):
   })
 
   return jsonify(response), 200
-
-
-@app.route('/categories', methods=['GET'])
-def home_page():
-    uri = "mongodb://GitHubCrawlerUser:g22LrJvULU5B@mobiledata.bigdatacorp.com.br:21766/MobileAppsData?authMechanism=MONGODB-CR"
-    packages = request.args.get("packages");
-    packages = packages.split(",")
-
-    #Create google play link for each package
-    for i in range(0, len(packages)):
-        packages[i] = 'https://play.google.com/store/apps/details?id=' + packages[i]
-
-    if len(packages) > 0:
-        # Grab categories for each google play link
-        apps = client.MobileAppsData.PlayStore_2016_04.find({ "Url": { "$in": packages } }, {"Category": 1})[0:]
-
-        return dumps(apps);
-    else:
-        return []
 
 if __name__ == '__main__':
     app.run(debug=True)
