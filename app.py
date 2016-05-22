@@ -10,8 +10,6 @@ from bson.json_util import dumps
 import random
 import ast
 
-# Service resource
-s3 = boto3.resource('s3')
 # Init flask app
 app = Flask(__name__)
 # Db client
@@ -142,7 +140,7 @@ def profile():
 
 @app.route('/categories', methods=['GET'])
 def getCategories():
-    packages = request.aargs.get("packages");
+    packages = request.args.get("packages");
     packages = packages.split(",")
 
     #Create google play link for each package
