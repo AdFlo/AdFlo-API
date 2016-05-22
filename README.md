@@ -8,9 +8,12 @@
     deactivate
 
 # Install package
-  pip install package_name && pip freeze > requirements.txt
+    pip install package_name && pip freeze > requirements.txt
 
-# Boto config ( stored in ~/.aws/credentials )
+# Start mongodb on port 27017
+    mongod
+<!-- # Boto config ( stored in ~/.aws/credentials )
     [default]
     aws_access_key_id = 123example
     aws_secret_access_key = 123example
+ -->
