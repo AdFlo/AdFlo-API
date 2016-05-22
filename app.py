@@ -17,7 +17,8 @@ s3 = boto3.resource('s3')
 app = Flask(__name__)
 # Db client
 client = pymongo.MongoClient("localhost", 27017)
-db = client.customerad
+customerad = client.customerad
+profilemodel = client.profile
 
 @app.route('/ad', methods=['POST'])
 def ad():
@@ -27,7 +28,7 @@ def ad():
   template = body['template']
   descriptors = body['descriptors']
 
-  response = db.collection.insert_one({
+  response = customerad.collection.insert_one({
     "TableName": "customerad",
     "Item": {
       "uuid": str(uuid.uuid4()),
@@ -41,7 +42,7 @@ def ad():
     }
   })
 
-  return json.dumps({'success':True}), 201, {'ContentType':'application/json'} 
+  return json.dumps({'success':True, 'id': str(response.inserted_id)}), 201, {'ContentType':'application/json'} 
 
 @app.route('/target', methods=['GET'])
 def target():
@@ -75,7 +76,7 @@ def target():
       category = percent
       break
 
-  for item in db.collection.find().sort("customer_clicks", pymongo.ASCENDING):
+  for item in customerad.collection.find().sort("customer_clicks", pymongo.ASCENDING):
     curr_item = item['Item']
     curr_descriptor = ast.literal_eval(curr_item['descriptors'])
 
@@ -89,9 +90,10 @@ def target():
 @app.route('/ad/<id>/click', methods=['POST'])
 def click(id):
   body = request.form
+  userid = body['userid']
   _id = id
 
-  response = db.collection.update({
+  customerad_res = customerad.collection.update({
     '_id': ObjectId(_id)
   }, {
     '$inc': {
@@ -99,7 +101,68 @@ def click(id):
     }
   })
 
-  return jsonify(response), 200
+  aa = profilemodel.collection.find({
+    '_id': ObjectId(userid)
+  })
+
+  try:
+    items = aa[0]['ads_served']
+    for k in items:
+      if k['uuid'] == _id:
+        dyn = profilemodel.collection.update({ "ads_served": { "$elemMatch": {"uuid": _id }}}, {"$inc": {
+          "ads_served.$.times_clicked": 1
+        }})
+        break
+  except:
+    profile_res = profilemodel.collection.update({
+      '_id': ObjectId(userid)
+    }, {
+      "$addToSet": {
+        "ads_served": {
+          "uuid": _id,
+          "times_clicked": 1,
+          "excluded": False
+        }
+      }
+    })
+
+  return jsonify({"success": True}), 200
+
+@app.route('/profile', methods=['POST'])
+def profile():
+  body = request.form
+
+  response = profilemodel.collection.insert_one({
+    "TableName": "profile",
+    "Item": {
+      "ads_served": []
+    }
+  })
+
+  return json.dumps({'id': str(response.inserted_id)}), 201, {'ContentType':'application/json'} 
+
+@app.route('/categories', methods=['GET'])
+def getCategories():
+    packages = request.aargs.get("packages");
+    packages = packages.split(",")
+
+    #Create google play link for each package
+    for i in range(0, len(packages)):
+        packages[i] = 'https://play.google.com/store/apps/details?id=' + packages[i]
+
+    if len(packages) > 0:
+        # Grab categories for each google play link
+        apps = crawlerClient.MobileAppsData.PlayStore_2016_04.find({ "Url": { "$in": packages } }, {"Category": 1})[0:]
+
+        return dumps(apps);
+    else:
+        return []
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+      #       "uuid": str(uuid.uuid4()),
+      #   "template": template,
+      #   "times_clicked": 0,
+      #   "exlcluded": False
+      # ]
