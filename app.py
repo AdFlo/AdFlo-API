@@ -3,7 +3,6 @@ import operator
 import uuid
 import json
 import pymongo
-import boto3
 from bson.objectid import ObjectId
 from flask import Flask, request, jsonify
 from bson import Binary, Code
